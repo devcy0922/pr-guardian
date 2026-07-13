@@ -4,6 +4,8 @@ import { runAllChecks } from './checklist/index.js';
 import { buildReport } from './report.js';
 import { loadGuardrails } from './guardrails.js';
 import { validateReport, repairReport } from './pipeline.js';
+import { renderHtmlReport } from './ui-renderer.js';
+import path from 'node:path';
 
 const MAX_RETRY = 1;
 
@@ -65,6 +67,11 @@ export async function review(owner: string, repo: string, prNumber: number): Pro
   // ── Stage 4: publish ──
   console.log('[Review] Stage: publish');
   try {
+    // HTML 리포트 로컬 생성
+    const reportPath = path.join(process.cwd(), 'outputs', 'reports', `pr-${prNumber}.html`);
+    await renderHtmlReport(checkResults, Date.now() - startMs, reportPath);
+    console.log(`[Review] HTML 리포트 저장 완료: ${reportPath}`);
+
     await github.createComment(owner, repo, prNumber, report);
     const elapsed = ((Date.now() - startMs) / 1000).toFixed(1);
     console.log(`[Review] 완료 — ${elapsed}s, LLM ${checkResults.llmCalls}회, ${checkResults.totalUsage.totalTokens} tokens`);
