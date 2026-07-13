@@ -1,0 +1,21 @@
+{
+  "action": "opened",
+  "number": 1,
+  "pull_request": {
+    "number": 1,
+    "title": "feat: 헬스체크 엔드포인트 추가",
+    "body": "## 변경 요약\nFastAPI 라우터에 /health 엔드포인트를 추가합니다.\n\n## 변경 파일\n- src/api/router.py: 헬스체크 라우트 추가\n- tests/test_health.py: 헬스체크 테스트\n\n## 테스트 방법\npytest tests/test_health.py 실행하여 200 응답 확인",
+    "head": {
+      "ref": "feature/john_GA-1234-add-health-check"
+    },
+    "user": {
+      "login": "john"
+    }
+  },
+  "repository": {
+    "name": "my-app",
+    "owner": {
+      "login": "devcy0922"
+    }
+  }
+}
