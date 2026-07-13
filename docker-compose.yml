@@ -1,0 +1,24 @@
+services:
+  pr-guardian:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pr-guardian
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - LLM_GATEWAY_URL=http://192.168.0.5:4000
+      - LLM_MODEL=${LLM_MODEL:-qwen3-8b}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    networks:
+      - shared_ai_net
+
+networks:
+  shared_ai_net:
+    name: shared_ai_net
+    external: true
