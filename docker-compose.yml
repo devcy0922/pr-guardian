@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: pr-guardian
     ports:
-      - "3000:3000"
+      - "3002:3000"
     environment:
       - PORT=3000
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}

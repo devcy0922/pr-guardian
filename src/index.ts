@@ -16,3 +16,6 @@ const port = Number(process.env.PORT ?? 3000);
 
 console.log(`[PR Guardian] 서버 시작 — port ${port}`);
 serve({ fetch: app.fetch, port });
+
+export default app;
+
