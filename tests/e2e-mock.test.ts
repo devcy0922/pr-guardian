@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { createHmac } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 
 // 환경변수 설정 (임포트 전 필수)
-process.env.GITHUB_WEBHOOK_SECRET = 'test-secret';
-process.env.GITHUB_TOKEN = 'mock-token';
+const testWebhookSecret = randomBytes(32).toString('hex');
+process.env.GITHUB_WEBHOOK_SECRET = testWebhookSecret;
+process.env.GITHUB_TOKEN = `unit-test-${randomBytes(16).toString('hex')}`;
 process.env.LLM_GATEWAY_URL = 'http://localhost:4000';
 
 /**
@@ -38,7 +39,7 @@ describe('E2E Webhook Endpoint Test', () => {
       },
     });
 
-    const sig = 'sha256=' + createHmac('sha256', 'test-secret').update(payload).digest('hex');
+    const sig = 'sha256=' + createHmac('sha256', testWebhookSecret).update(payload).digest('hex');
 
     const res = await app.request('/webhook/github', {
       method: 'POST',
@@ -91,7 +92,7 @@ describe('E2E Webhook Endpoint Test', () => {
       },
     });
 
-    const sig = 'sha256=' + createHmac('sha256', 'test-secret').update(payload).digest('hex');
+    const sig = 'sha256=' + createHmac('sha256', testWebhookSecret).update(payload).digest('hex');
 
     const res = await app.request('/webhook/github', {
       method: 'POST',

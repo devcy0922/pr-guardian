@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { randomBytes } from 'node:crypto';
 import { verifySignature } from '../src/webhook.js';
 
 describe('verifySignature', () => {
-  const secret = 'test-secret-key';
+  const secret = randomBytes(32).toString('hex');
 
   it('올바른 시그니처는 통과', () => {
     const payload = '{"test": true}';

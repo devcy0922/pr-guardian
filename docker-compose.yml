@@ -8,13 +8,13 @@ services:
       - "3002:3000"
     environment:
       - PORT=3000
-      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:?GITHUB_WEBHOOK_SECRET를 설정하세요}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:?GITHUB_TOKEN을 설정하세요}
       - LLM_GATEWAY_URL=${LLM_GATEWAY_URL}
       - LLM_MODEL=${LLM_MODEL:-qwen3-8b}
-      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_API_KEY=${LLM_API_KEY:?LLM_API_KEY를 설정하세요}
       - LOG_LEVEL=info
-      - JIRA_HOST=${JIRA_HOST}
+      - JIRA_BASE_URL=${JIRA_BASE_URL}
       - JIRA_EMAIL=${JIRA_EMAIL}
       - JIRA_API_TOKEN=${JIRA_API_TOKEN}
       - AUTO_PM_ENABLED=${AUTO_PM_ENABLED:-true}

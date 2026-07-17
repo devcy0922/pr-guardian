@@ -3,8 +3,8 @@ dist/
 .env
 *.log
 
-# AI Agent Rules & States
-agents/state/
-agents/rules/L2-*.md
-agents/rules/L3-*.md
-
+# 로컬 에이전트 지침 및 상태
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+agents/

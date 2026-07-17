@@ -1,5 +1,6 @@
 import { review } from '../src/reviewer.js';
 import { GitHubClient } from '../src/github.js';
+import { randomBytes } from 'node:crypto';
 
 // GitHub REST API 클라이언트 모킹 (검증 규격을 완벽히 통과하여 [승인 가능] 최종의견 획득 유도)
 const originalGetPullRequest = GitHubClient.prototype.getPullRequest;
@@ -50,9 +51,11 @@ GitHubClient.prototype.getPullRequestFiles = async function(owner: string, repo:
 };
 
 // 임시 환경변수 설정
-process.env.GITHUB_WEBHOOK_SECRET = 'local-secret';
-process.env.GITHUB_TOKEN = process.env.GITHUB_TOKEN ?? 'mock-token';
-process.env.LLM_GATEWAY_URL = process.env.LLM_GATEWAY_URL ?? 'http://192.168.0.5:4000';
+process.env.GITHUB_WEBHOOK_SECRET ??= randomBytes(32).toString('hex');
+
+if (!process.env.GITHUB_TOKEN || !process.env.LLM_GATEWAY_URL || !process.env.LLM_API_KEY) {
+  throw new Error('GITHUB_TOKEN, LLM_GATEWAY_URL, LLM_API_KEY를 실행 환경에 설정하세요.');
+}
 process.env.LLM_MODEL = process.env.LLM_MODEL ?? 'qwen3-8b';
 
 async function runSimulation() {

@@ -10,7 +10,7 @@ import { loadGuardrails } from '../guardrails.js';
  * 이미 GitHub/Jira 데이터를 수집한 외부 시스템이 페이로드를 직접 전달하여
  * 분석만 수행하고 결과를 JSON으로 반환하는 모드.
  *
- * 보안: nginx 레벨에서 192.168.x.x 대역만 접근 허용 (ai-service-infra 설정)
+ * 보안: 리버스 프록시에서 신뢰된 내부 네트워크만 접근 허용
  *       소스 코드에 인증 정보 없음 (퍼블릭 레포 보안 원칙 준수)
  */
 
