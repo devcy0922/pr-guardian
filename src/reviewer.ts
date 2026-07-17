@@ -1,30 +1,34 @@
 import { GitHubClient } from './github.js';
 import { LLMClient } from './llm.js';
+import { JiraClient } from './jira.js';
+import { loadGuardrails } from './guardrails.js';
 import { runAllChecks } from './checklist/index.js';
 import { buildReport } from './report.js';
-import { loadGuardrails } from './guardrails.js';
-import { validateReport, repairReport } from './pipeline.js';
-import { renderHtmlReport } from './ui-renderer.js';
-import path from 'node:path';
+import { PMAutomationService } from './pm-automation.js';
 
-const MAX_RETRY = 1;
+// Jira 키 매핑 정규식 헬퍼
+function extractJiraKey(title: string, branch: string): string | null {
+  const pattern = /([A-Za-z]+-\d+)/;
+  const titleMatch = title.match(pattern);
+  if (titleMatch) return titleMatch[1].toUpperCase();
+  const branchMatch = branch.match(pattern);
+  if (branchMatch) return branchMatch[1].toUpperCase();
+  return null;
+}
 
 /**
- * PR 리뷰 파이프라인
- *
- * collect → analyze → assemble → validate → publish
- *                       ↑            ↓ fail
- *                       └── retry (max 1)
+ * 8대 체크리스트 병렬 파이프라인 PR 자동 리뷰 엔진
  */
 export async function review(owner: string, repo: string, prNumber: number): Promise<void> {
   const startMs = Date.now();
   const github = new GitHubClient();
   const llm = new LLMClient();
+  const jira = new JiraClient();
 
-  console.log(`[Review] 파이프라인 시작 — ${owner}/${repo}#${prNumber}`);
+  console.log(`[Review] 병렬 체크리스트 파이프라인 시작 — ${owner}/${repo}#${prNumber}`);
 
-  // ── Stage 1: collect ──
-  console.log('[Review] Stage: collect');
+  // 1. 기초 리소스 수집
+  console.log('[Review] PR 및 소스 코드 수집 중...');
   const [pr, files, diff, guardrails] = await Promise.all([
     github.getPullRequest(owner, repo, prNumber),
     github.getPullRequestFiles(owner, repo, prNumber),
@@ -32,59 +36,64 @@ export async function review(owner: string, repo: string, prNumber: number): Pro
     loadGuardrails(),
   ]);
 
-  const ctx = { pr, files, diff, guardrails };
-
-  // ── Stage 2: analyze ──
-  console.log('[Review] Stage: analyze');
-  const checkResults = await runAllChecks(ctx, llm);
-
-  // ── Stage 3: assemble + validate (retry loop) ──
-  let report = '';
-  let attempts = 0;
-
-  while (attempts <= MAX_RETRY) {
-    attempts++;
-    console.log(`[Review] Stage: assemble (attempt ${attempts})`);
-    report = buildReport(checkResults, Date.now() - startMs);
-
-    console.log(`[Review] Stage: validate (attempt ${attempts})`);
-    const validation = validateReport(report, checkResults);
-
-    if (validation.valid) {
-      console.log('[Review] 리포트 검증 통과');
-      break;
+  // Jira 이슈 연동 조회
+  let jiraData = null;
+  const jiraKey = extractJiraKey(pr.title, pr.branch);
+  if (jiraKey) {
+    console.log(`[Review] 감지된 Jira Key: ${jiraKey}. Jira 이슈 정보 조회 중...`);
+    try {
+      jiraData = await jira.getIssue(jiraKey);
+    } catch (err) {
+      console.error(`[Review] Jira 이슈 조회 실패 (${jiraKey}):`, err);
     }
-
-    console.warn(`[Review] 검증 실패 (attempt ${attempts}): ${validation.issues.join(', ')}`);
-
-    if (attempts <= MAX_RETRY) {
-      // 복구 시도
-      report = repairReport(report, validation.issues);
-      console.log('[Review] 리포트 복구 적용');
-    }
+  } else {
+    console.log('[Review] PR 제목/브랜치명에서 Jira Key를 감지하지 못했습니다.');
   }
 
-  // ── Stage 4: publish ──
-  console.log('[Review] Stage: publish');
-  try {
-    // HTML 리포트 로컬 생성
-    const reportPath = path.join(process.cwd(), 'outputs', 'reports', `pr-${prNumber}.html`);
-    await renderHtmlReport(checkResults, Date.now() - startMs, reportPath);
-    console.log(`[Review] HTML 리포트 저장 완료: ${reportPath}`);
+  // 2. 체크리스트 실행 컨텍스트 구성
+  const context = {
+    pr,
+    files,
+    diff,
+    guardrails,
+    jira: jiraData ? { summary: jiraData.summary, description: jiraData.description, fixVersions: jiraData.fixVersions } : null,
+  };
 
-    await github.createComment(owner, repo, prNumber, report);
-    const elapsed = ((Date.now() - startMs) / 1000).toFixed(1);
-    console.log(`[Review] 완료 — ${elapsed}s, LLM ${checkResults.llmCalls}회, ${checkResults.totalUsage.totalTokens} tokens`);
-  } catch (err) {
-    console.error('[Review] 코멘트 작성 실패:', err);
-    // 실패 시 에러 코멘트라도 남기기
+  try {
+    console.log('[Review] 8대 체크리스트 병렬 실행 중...');
+    const checkResults = await runAllChecks(context, llm);
+    const elapsedMs = Date.now() - startMs;
+
+    console.log('[Review] 체크리스트 완료. 리포트 조립 중...');
+    const finalReport = buildReport(checkResults, elapsedMs);
+
+    console.log('[Review] GitHub PR 코멘트 작성 중...');
+    await github.createComment(owner, repo, prNumber, finalReport);
+    console.log('[Review] 완료 — GitHub PR 코멘트 작성 성공');
+
+    // 3. PM 자동화 적용 (라벨, 마일스톤, 프로젝트 연동)
     try {
-      await github.createComment(owner, repo, prNumber,
-        `## 🛡️ PR Guardian — 오류 발생\n\n리뷰 파이프라인 실행 중 오류가 발생했습니다.\n\n\`\`\`\n${String(err)}\n\`\`\`\n\n> 🤖 PR Guardian v0.1.0`,
+      console.log('[Review] PM 자동화 실행 중...');
+      const pmAutomation = new PMAutomationService(github);
+      await pmAutomation.run(owner, repo, prNumber, {
+        pr,
+        files,
+        jira: jiraData,
+      });
+    } catch (pmErr) {
+      console.error('[Review] PM 자동화 실행 오류 (리뷰 결과 반영은 완료됨):', pmErr);
+    }
+  } catch (err) {
+    console.error('[Review] 리뷰 파이프라인 실행 실패:', err);
+    try {
+      await github.createComment(
+        owner,
+        repo,
+        prNumber,
+        `## 🛡️ PR Guardian — 오류 발생\n\n리뷰 실행 도중 시스템 오류가 발생했습니다.\n\n\`\`\`\n${String(err)}\n\`\`\`\n\n> 🤖 PR Guardian v0.1.0 (Parallel Engine)`,
       );
     } catch {
-      // 에러 코멘트도 실패하면 로그만
-      console.error('[Review] 에러 코멘트 작성도 실패');
+      console.error('[Review] 에러 피드백 코멘트 작성도 실패');
     }
   }
 }

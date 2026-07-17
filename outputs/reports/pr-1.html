@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PR Guardian Review Report</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #0d1117;
+      --card-bg: #161b22;
+      --text-color: #c9d1d9;
+      --text-bright: #f0f6fc;
+      --primary: #58a6ff;
+      --border-color: #30363d;
+      --success: #2ea44f;
+      --warning: #d29922;
+      --danger: #f85149;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 800px;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    h1, h2, h3 {
+      color: var(--text-bright);
+      margin-top: 0;
+    }
+
+    h1 {
+      font-size: 28px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .summary-section {
+      background: rgba(88, 166, 255, 0.1);
+      border-left: 4px solid var(--primary);
+      padding: 20px;
+      border-radius: 6px;
+      margin-bottom: 30px;
+    }
+
+    .summary-title {
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+
+    th, td {
+      border: 1px solid var(--border-color);
+      padding: 12px 16px;
+      text-align: left;
+    }
+
+    th {
+      background-color: rgba(255, 255, 255, 0.05);
+      color: var(--text-bright);
+    }
+
+    tr:nth-child(even) {
+      background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-pass { background-color: rgba(46, 164, 79, 0.2); color: #56d364; }
+    .badge-warn { background-color: rgba(210, 153, 34, 0.2); color: #e3b341; }
+    .badge-fail { background-color: rgba(248, 81, 73, 0.2); color: #ff7b72; }
+    .badge-info { background-color: rgba(88, 166, 255, 0.2); color: #79c0ff; }
+
+    footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-color);
+      font-size: 12px;
+      color: #8b949e;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🛡️ PR Guardian Review Report</h1>
+    
+    <div class="summary-section">
+      <div class="summary-title">📝 작업 요약</div>
+      <div id="summary-content"><ul><li>SCRUM-5 이슈 연동을 위해 PR Guardian 리뷰 테스트용 도구와 설정 파일을 추가했습니다.</li><li>Jira 트리거 및 모의 웹훅(Mock Webhook) 실행을 위한 쉘 스크립트를 구현했습니다.</li><li>에이전트 격리 규칙과 Gitignore 설정을 신규 파일로 구성하여 테스트 환경을 구축했습니다.</li></ul></div>
+    </div>
+
+    <h2>📊 체크리스트</h2>
+    <div id="checklist-table">
+    <table>
+      <thead>
+        <tr>
+          <th>항목</th>
+          <th>상태</th>
+          <th>상세 분석</th>
+        </tr>
+      </thead>
+      <tbody>
+  
+      <tr>
+        <td><strong>플랜 문서 존재</strong></td>
+        <td><span class="badge badge-warn">⚠️ WARN</span></td>
+        <td>PR 본문에 설계/계획 관련 키워드 또는 문서 파일이 없습니다.</td>
+      </tr>
+    
+      <tr>
+        <td><strong>테스트 코드 존재</strong></td>
+        <td><span class="badge badge-fail">❌ FAIL</span></td>
+        <td>변경된 파일 중 테스트 코드가 없습니다.</td>
+      </tr>
+    
+      <tr>
+        <td><strong>컨벤션 준수</strong></td>
+        <td><span class="badge badge-fail">❌ FAIL</span></td>
+        <td>- 브랜치명 `test/scrum-5`이 규칙 불일치 (feature/|hotfix/|bugfix/|release/ 필요)</td>
+      </tr>
+    
+      <tr>
+        <td><strong>보안성 위반</strong></td>
+        <td><span class="badge badge-pass">✅ PASS</span></td>
+        <td>패턴 1건 탐지 → LLM 검증 결과 모두 오탐(false positive)</td>
+      </tr>
+    
+      <tr>
+        <td><strong>테스트 코드 평가</strong></td>
+        <td><span class="badge badge-skip">⏭️ SKIP</span></td>
+        <td>변경된 테스트 파일 없음 — 평가 생략</td>
+      </tr>
+    
+      <tr>
+        <td><strong>플랜 ↔ 작업 일치</strong></td>
+        <td><span class="badge badge-warn">⚠️ WARN</span></td>
+        <td>PR 본문이 76자로 불충분 — 플랜 일치 검증 불가</td>
+      </tr>
+    </tbody></table></div>
+
+    <h2>📁 수정 파일 분류</h2>
+    <div id="file-table"><table><thead><tr><th>카테고리</th><th>파일 수</th><th>+/-</th><th>주요 파일</th></tr></thead><tbody><tr><td>Other</td><td>3</td><td>+166 -0</td><td>`.gitignore`, `jira-trigger.sh`, `mock-webhook.sh`</td></tr><tr><td>Docs</td><td>3</td><td>+76 -0</td><td>`AGENTS.md`, `L1-00-bootstream.md`, `rules.md`</td></tr></tbody></table></div>
+
+    <footer>
+      <span>🤖 Powered by PR Guardian & GoVail Gateway</span>
+      <span id="meta-info">LLM 호출: 2회 | 토큰 사용: 2676 | 소요: 29.9s</span>
+    </footer>
+  </div>
+</body>
+</html>
