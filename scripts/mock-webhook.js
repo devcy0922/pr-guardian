@@ -64,7 +64,8 @@ const options = {
 };
 
 try {
-  const response = await fetch(`http://localhost:${port}/webhook`, options);
+  const targetHost = process.env.TARGET_HOST || 'localhost';
+  const response = await fetch(`http://${targetHost}:${port}/webhook/github`, options);
   const text = await response.text();
   console.log(`✉️ 응답 상태: ${response.status}`);
   console.log(`✉️ 응답 본문: ${text}`);

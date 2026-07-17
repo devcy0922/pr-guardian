@@ -10,10 +10,17 @@ services:
       - PORT=3000
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - LLM_GATEWAY_URL=http://192.168.0.5:4000
+      - LLM_GATEWAY_URL=${LLM_GATEWAY_URL}
       - LLM_MODEL=${LLM_MODEL:-qwen3-8b}
       - LLM_API_KEY=${LLM_API_KEY}
       - LOG_LEVEL=info
+      - JIRA_HOST=${JIRA_HOST}
+      - JIRA_EMAIL=${JIRA_EMAIL}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN}
+      - AUTO_PM_ENABLED=${AUTO_PM_ENABLED:-true}
+      - AUTO_PM_PROJECT_NUMBER=${AUTO_PM_PROJECT_NUMBER:-1}
+      - AUTO_PM_CREATE_MILESTONE=${AUTO_PM_CREATE_MILESTONE:-false}
+      - SENSITIVE_HOSTNAMES=${SENSITIVE_HOSTNAMES}
     restart: unless-stopped
     networks:
       - shared_ai_net

@@ -41,11 +41,17 @@ export async function checkTestQuality(ctx: CheckContext, llm: LLMClient): Promi
     .slice(0, 100)
     .join('\n');
 
-  const systemPrompt = '테스트 코드 품질 평가관. 등급과 이유 JSON 출력. {"grade":"A|B|C|D","reason":"...","suggestions":["..."]}';
+  const systemPrompt = '테스트 코드 품질 평가관. 등급과 이유 JSON 출력. {"grade":"A|B|C|D","reason":"...","suggestions":["..."]}. 이모지는 절대 사용하지 마세요(No emojis). 생각 과정(thinking/reasoning)은 생략하거나 아주 간결히 작성하고 즉시 JSON만 출력하세요. Skip thinking and output JSON directly.';
   const userPrompt = `테스트 diff:\n${testDiff}`;
 
   try {
-    const result = await llm.chat({ systemPrompt, userPrompt, maxTokens: 256 });
+    const result = await llm.chat({
+      systemPrompt,
+      userPrompt,
+      maxTokens: 3072,
+      jsonMode: true,
+      reasoningEffort: 'low'
+    });
     const parsed = llm.parseJson(result.content, TestQualitySchema);
 
     const gradeStatus = { A: 'pass', B: 'pass', C: 'warn', D: 'fail' } as const;

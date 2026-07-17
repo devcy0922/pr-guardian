@@ -5,11 +5,11 @@ import { emptyUsage, mergeUsage } from '../llm.js';
 import { checkSummary } from './summary.js';
 import { checkConvention } from './convention.js';
 import { checkSecurity } from './security.js';
-import { checkPlanExists } from './plan-exists.js';
 import { checkTestExists } from './test-exists.js';
 import { checkTestQuality } from './test-quality.js';
 import { checkFileClassify } from './file-classify.js';
 import { checkPlanMatch } from './plan-match.js';
+import { checkBusinessIntent } from './business-intent.js';
 
 /** 체크 상태 */
 export type CheckStatus = 'pass' | 'warn' | 'fail' | 'skip' | 'info';
@@ -30,12 +30,18 @@ export interface GuardrailSet {
   skills: Record<string, string>;
 }
 
+export interface JiraIssueData {
+  summary: string;
+  description: string;
+}
+
 /** 체크리스트 실행 컨텍스트 */
 export interface CheckContext {
   pr: PullRequestData;
   files: PullRequestFile[];
   diff: string;
   guardrails: GuardrailSet;
+  jira?: JiraIssueData | null;
 }
 
 /** 전체 체크 결과 */
@@ -45,31 +51,31 @@ export interface CheckRunResult {
   llmCalls: number;
 }
 
-/** 상태별 이모지 */
+/** 상태별 텍스트 배지 (이모지 전면 제거) */
 export function statusEmoji(status: CheckStatus): string {
   const map: Record<CheckStatus, string> = {
-    pass: '✅', warn: '⚠️', fail: '❌', skip: '⏭️', info: 'ℹ️',
+    pass: 'PASS', warn: 'WARN', fail: 'FAIL', skip: 'SKIP', info: 'INFO',
   };
-  return map[status];
+  return `[${map[status]}]`;
 }
 
 /**
  * 모든 체크리스트 병렬 실행
- * Layer 0 (Deterministic) + Layer 1 (Hybrid) + Layer 2 (LLM) 동시 실행
+ * Layer 0 (Deterministic) + Layer 1 (Hybrid/LLM) + Layer 2 (LLM) 동시 실행
  */
 export async function runAllChecks(ctx: CheckContext, llm: LLMClient): Promise<CheckRunResult> {
   const results = await Promise.all([
     // Layer 0 — Deterministic (LLM 0회)
-    checkPlanExists(ctx),
     checkTestExists(ctx),
     checkFileClassify(ctx),
-    // Layer 1 — Hybrid (조건부 LLM)
-    checkConvention(ctx, llm),
+    // Layer 1 — Hybrid (정적 검증 후 필요시 조건부 LLM 호출)
+    checkConvention(ctx),
     checkSecurity(ctx, llm),
-    // Layer 2 — LLM 필수
+    // Layer 2 — LLM 필수 (병렬 동시 실행)
     checkSummary(ctx, llm),
     checkTestQuality(ctx, llm),
     checkPlanMatch(ctx, llm),
+    checkBusinessIntent(ctx, llm),
   ]);
 
   const usages = results.map((r) => r.tokenUsage);

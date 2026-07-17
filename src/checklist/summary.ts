@@ -20,11 +20,17 @@ export async function checkSummary(ctx: CheckContext, llm: LLMClient): Promise<C
   // diff에서 핵심 hunk 추출 (함수 시그니처, export, class 변경 중심)
   const keyHunks = extractKeyHunks(ctx.diff, 80);
 
-  const systemPrompt = 'PR diff 분석하여 3줄 한글 요약 JSON 출력. {"summary":["줄1","줄2","줄3"]}';
+  const systemPrompt = 'PR diff 분석하여 3줄 한글 요약 JSON 출력. {"summary":["줄1","줄2","줄3"]}. 이모지는 절대 사용하지 마세요(No emojis). 생각 과정(thinking/reasoning)은 생략하고 즉시 JSON만 출력하세요. Skip thinking and output JSON directly.';
   const userPrompt = `제목: ${ctx.pr.title}\n본문: ${ctx.pr.body.slice(0, 300)}\n\n파일:\n${fileList}\n\n주요변경:\n${keyHunks}`;
 
   try {
-    const result = await llm.chat({ systemPrompt, userPrompt, maxTokens: 256 });
+    const result = await llm.chat({
+      systemPrompt,
+      userPrompt,
+      maxTokens: 150,
+      jsonMode: true,
+      reasoningEffort: 'none'
+    });
     const parsed = llm.parseJson(result.content, SummarySchema);
 
     return {

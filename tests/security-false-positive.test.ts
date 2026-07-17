@@ -8,6 +8,7 @@ describe('Security False Positive Handling Test', () => {
     // 1. AWS API 키와 유사한 더미 패턴이 포함된 diff 컨텍스트
     const mockCtx: CheckContext = {
       pr: {
+        nodeId: 'node_1',
         title: 'test: add mock tests',
         body: 'Adding test fixtures',
         branch: 'feature/mock-tests',
