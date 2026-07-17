@@ -17,7 +17,7 @@ app.post('/webhook/github', handleWebhook);
 /**
  * API 직접 리뷰 모드
  * 이미 수집된 PR/Jira 데이터를 페이로드로 받아 분석 후 JSON 반환.
- * 인증: nginx(ai-service-infra) 레벨에서 192.168.x.x 대역만 허용.
+ * 인증: 리버스 프록시에서 신뢰된 내부 네트워크만 허용.
  */
 app.post('/api/review', handleApiReview);
 

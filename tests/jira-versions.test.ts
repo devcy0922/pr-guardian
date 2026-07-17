@@ -1,12 +1,13 @@
+import { randomBytes } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { JiraClient } from '../src/jira.js';
 
 describe('JiraClient fixVersions 파싱 테스트', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.JIRA_HOST = 'test.atlassian.net';
+    process.env.JIRA_BASE_URL = 'https://jira.example.com';
     process.env.JIRA_EMAIL = 'test@example.com';
-    process.env.JIRA_API_TOKEN = 'token';
+    process.env.JIRA_API_TOKEN = `unit-test-${randomBytes(16).toString('hex')}`;
   });
 
   it('Jira API 응답의 fixVersions를 올바르게 파싱해야 함', async () => {
@@ -45,7 +46,7 @@ describe('JiraClient fixVersions 파싱 테스트', () => {
     const result = await jiraClient.getIssue('PROJ-123');
 
     expect(fetchSpy).toHaveBeenCalledWith(
-      'https://test.atlassian.net/rest/api/3/issue/PROJ-123',
+      'https://jira.example.com/rest/api/3/issue/PROJ-123',
       expect.any(Object)
     );
 

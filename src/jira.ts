@@ -9,25 +9,25 @@ export interface JiraIssueData {
  * Jira Cloud API 연동 클라이언트
  */
 export class JiraClient {
-  private host: string;
+  private baseUrl: string;
   private email: string;
   private token: string;
 
   constructor() {
-    this.host = process.env.JIRA_HOST ?? '';
+    this.baseUrl = (process.env.JIRA_BASE_URL ?? '').replace(/\/+$/, '');
     this.email = process.env.JIRA_EMAIL ?? '';
     this.token = process.env.JIRA_API_TOKEN ?? '';
   }
 
   /** Jira 이슈 데이터 가져오기 */
   async getIssue(issueKey: string): Promise<JiraIssueData | null> {
-    if (!this.host || !this.email || !this.token) {
+    if (!this.baseUrl || !this.email || !this.token) {
       console.warn('[Jira] 설정 정보가 누락되어 Jira 연동을 스킵합니다.');
       return null;
     }
 
     const auth = Buffer.from(`${this.email}:${this.token}`).toString('base64');
-    const url = `https://${this.host}/rest/api/3/issue/${issueKey}`;
+    const url = `${this.baseUrl}/rest/api/3/issue/${issueKey}`;
 
     try {
       const res = await fetch(url, {

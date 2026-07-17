@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 🧪 GitHub Webhook 수동 모킹 스크립트 (node.js 기반)
-// Usage: ./mock-webhook.sh [PR번호]
+// Usage: node scripts/mock-webhook.js [PR번호]
 
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 
 // 1. .env 파일 로드
 const envPath = resolve(process.cwd(), '.env');
-let secret = 'your_secret'; // 기본값
+let secret = process.env.GITHUB_WEBHOOK_SECRET ?? '';
 let port = 3002; // 기본값
 
 try {
@@ -28,7 +28,11 @@ try {
     port = parseInt(envVars['PORT'], 10);
   }
 } catch (e) {
-  // .env 파일이 없거나 읽을 수 없는 경우 기본값 사용
+  // .env 파일이 없으면 프로세스 환경변수를 사용한다.
+}
+
+if (!secret) {
+  throw new Error('GITHUB_WEBHOOK_SECRET를 실행 환경에 설정하세요.');
 }
 
 const prNumber = parseInt(process.argv[2] || '1', 10);
