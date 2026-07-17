@@ -2,3 +2,9 @@ node_modules/
 dist/
 .env
 *.log
+
+# AI Agent Rules & States
+agents/state/
+agents/rules/L2-*.md
+agents/rules/L3-*.md
+
