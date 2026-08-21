@@ -93,7 +93,7 @@ describe('RepositoryStore & GitHub Issue Parser & Report Builder', () => {
           label: '구체적 코드 개선 제안',
           status: 'info',
           emoji: '[INFO]',
-          detail: '### 💡 추천 코드 개선안\n- Null 체크 보강 권장',
+          detail: '### 추천 코드 개선안\n- Null 체크 보강 권장',
           tokenUsage: { promptTokens: 25, completionTokens: 10, totalTokens: 35 },
         },
       ],

@@ -1,4 +1,4 @@
-# 🛡️ PR Guardian Architecture
+# PR Guardian Architecture
 
 > **GitHub Copilot 수준의 프로젝트 이해도와 연관성 추적(Traceability)을 제공하는 개인화 코드 리뷰 엔진 & MCP 서버**
 

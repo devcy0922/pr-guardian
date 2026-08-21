@@ -18,11 +18,11 @@ export function buildReport(checkResults: CheckRunResult, elapsedMs: number): st
 
   const lines: string[] = [];
 
-  lines.push('# 🛡️ PR Guardian 자동 리뷰 보고서');
+  lines.push('# PR Guardian 자동 리뷰 보고서');
   lines.push('');
 
   // 1. 요약 및 비즈니스 맥락
-  lines.push('### 📝 요약 및 비즈니스 의도');
+  lines.push('### 요약 및 비즈니스 의도');
   if (summary && summary.detail) {
     lines.push(summary.detail);
   } else {
@@ -37,7 +37,7 @@ export function buildReport(checkResults: CheckRunResult, elapsedMs: number): st
   }
 
   // 2. 체크리스트 수행 결과
-  lines.push('### 📊 체크리스트 수행 결과');
+  lines.push('### 체크리스트 수행 결과');
   lines.push('| 검사 항목 | 상태 배지 | 요약 결과 |');
   lines.push('|---|---|---|');
 
@@ -59,20 +59,20 @@ export function buildReport(checkResults: CheckRunResult, elapsedMs: number): st
 
   // 3. 이슈 ↔ PR 연관성 및 누락/범위 초과 검증 (Plan Match)
   if (planMatch && planMatch.detail) {
-    lines.push('### 🎯 연관 이슈 ↔ PR 정합성 (Traceability)');
+    lines.push('### 연관 이슈 ↔ PR 정합성 (Traceability)');
     lines.push(planMatch.detail);
     lines.push('');
   }
 
   // 4. 구체적 코드 개선 제안 (Actionable Code Suggestions)
   if (actionableSuggestions && actionableSuggestions.detail) {
-    lines.push('### 💡 구체적 코드 개선 제안 (Actionable Suggestions)');
+    lines.push('### 구체적 코드 개선 제안 (Actionable Suggestions)');
     lines.push(actionableSuggestions.detail);
     lines.push('');
   }
 
   // 5. 최종결과 설명
-  lines.push('### 🔍 최종 검토 판정');
+  lines.push('### 최종 검토 판정');
 
   const hasFail = results.some((r) => r.status === 'fail');
   const hasWarn = results.some((r) => r.status === 'warn');
@@ -103,7 +103,7 @@ export function buildReport(checkResults: CheckRunResult, elapsedMs: number): st
     lines.push('**발견된 주의 사항 및 조치 권장:**');
     lines.push('');
     for (const v of violations) {
-      lines.push(`- **${v.label} (${v.emoji})**:`);
+      lines.push(`- **${v.label}**:`);
       const blockDetail = v.detail.replace(/\n/g, '\n  ');
       lines.push(`  ${blockDetail}`);
       lines.push('');
@@ -114,7 +114,7 @@ export function buildReport(checkResults: CheckRunResult, elapsedMs: number): st
   const elapsed = (elapsedMs / 1000).toFixed(1);
   const totalTokens = totalUsage.totalTokens;
   lines.push('---');
-  lines.push(`> 🤖 PR Guardian v0.2.0 (MCP Agent Engine) | 소요 시간: ${elapsed}s | 토큰 소모: ~${totalTokens} tok`);
+  lines.push(`> PR Guardian v0.2.0 (MCP Agent Engine) | 소요 시간: ${elapsed}s | 토큰 소모: ~${totalTokens} tok`);
 
   return lines.join('\n');
 }

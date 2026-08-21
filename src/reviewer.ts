@@ -179,7 +179,7 @@ export async function review(
     const errorMsg = String(err);
     console.error('[Review] 리뷰 파이프라인 실행 실패:', err);
 
-    const errorReport = `## 🛡️ PR Guardian — 오류 발생\n\n리뷰 실행 도중 시스템 오류가 발생했습니다.\n\n\`\`\`\n${errorMsg}\n\`\`\`\n\n> 🤖 PR Guardian v0.2.0 (MCP Agent Engine)`;
+    const errorReport = `## [PR Guardian] 오류 발생\n\n리뷰 실행 도중 시스템 오류가 발생했습니다.\n\n\`\`\`\n${errorMsg}\n\`\`\`\n\n> PR Guardian v0.2.0 (MCP Agent Engine)`;
 
     if (publishComment) {
       try {

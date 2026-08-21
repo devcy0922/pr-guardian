@@ -75,7 +75,7 @@ server.tool(
         content: [
           {
             type: 'text',
-            text: `✅ 레포지토리 [${config.owner}/${config.repo}] 등록 완료:\n${JSON.stringify(config, null, 2)}`,
+            text: `[성공] 레포지토리 [${config.owner}/${config.repo}] 등록 완료:\n${JSON.stringify(config, null, 2)}`,
           },
         ],
       };
@@ -111,7 +111,7 @@ server.tool(
           content: [
             {
               type: 'text',
-              text: `✅ 레포지토리 [${args.owner}/${args.repo}] 등록 해제 완료.`,
+              text: `[성공] 레포지토리 [${args.owner}/${args.repo}] 등록 해제 완료.`,
             },
           ],
         };

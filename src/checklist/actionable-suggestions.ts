@@ -113,7 +113,7 @@ export async function checkActionableSuggestions(
       };
     }
 
-    detail += `### 💡 추천 코드 개선안 (${parsed.suggestions.length}건)\n\n`;
+    detail += `### 추천 코드 개선안 (${parsed.suggestions.length}건)\n\n`;
     for (let i = 0; i < parsed.suggestions.length; i++) {
       const item = parsed.suggestions[i];
       detail += `#### ${i + 1}. \`${item.file}\` (${item.lineOrSymbol}) [${item.type.toUpperCase()}]\n`;

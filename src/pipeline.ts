@@ -75,11 +75,11 @@ export function repairReport(report: string, validationIssues: string[]): string
 
   // 필수 섹션 누락 시 추가
   if (validationIssues.some((i) => i.includes('PR Guardian'))) {
-    repaired = `## 🛡️ PR Guardian Review Report\n\n${repaired}`;
+    repaired = `## [PR Guardian] Review Report\n\n${repaired}`;
   }
 
   // 리포트 하단에 검증 경고 추가
-  repaired += `\n\n> ⚠️ 리포트 자동 복구 적용됨: ${validationIssues.join(', ')}`;
+  repaired += `\n\n> [알림] 리포트 자동 복구 적용됨: ${validationIssues.join(', ')}`;
 
   return repaired;
 }
