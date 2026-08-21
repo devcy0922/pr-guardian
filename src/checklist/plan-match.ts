@@ -6,52 +6,59 @@ import { statusEmoji } from './index.js';
 
 const PlanMatchSchema = z.object({
   match: z.boolean(),
-  gaps: z.array(z.string()),
-  extras: z.array(z.string()),
+  gaps: z.array(z.string()).describe('기획/이슈 요구사항 중 코드에 누락된 항목'),
+  extras: z.array(z.string()).describe('이슈 범위를 벗어나 불필요하게 추가된 사이드 변경 항목'),
+  analysisSummary: z.string().describe('전반적인 일치성 분석 요약'),
 });
 
 /**
- * Layer 2 — Jira ↔ PR ↔ 작업 일치성 검사 (LLM)
- * Jira 기획 의도와 PR 개발 계획, 그리고 실제 코드 변경 사항이 일치하는지 삼중 검증
+ * Layer 2 — 이슈(GitHub/Jira) ↔ PR ↔ 실제 작업 일치성 검사 (LLM)
+ * 이슈 기획 의도와 PR 개발 계획, 그리고 실제 코드 변경 사항이 일치하는지 삼중 검증
  */
 export async function checkPlanMatch(ctx: CheckContext, llm: LLMClient): Promise<CheckResult> {
-  const jiraSummary = ctx.jira ? ctx.jira.summary : 'Jira 연동 없음';
-  const jiraDesc = ctx.jira ? ctx.jira.description : 'Jira 연동 없음';
+  const issueTitle = ctx.issue?.title ?? ctx.jira?.summary ?? '연관 이슈 없음';
+  const issueDesc = ctx.issue?.description ?? ctx.jira?.description ?? '연관 이슈 없음';
+  const issueType = ctx.issue?.type ? ctx.issue.type.toUpperCase() : ctx.jira ? 'JIRA' : 'NONE';
+  const issueKey = ctx.issue?.keyOrNumber ?? '';
 
-  // PR body가 50자 미만이고 Jira 연동도 없으면 LLM 호출 없이 warn
-  if (ctx.pr.body.length < 50 && !ctx.jira) {
+  const hasIssue = Boolean(ctx.issue || ctx.jira);
+
+  // PR body가 50자 미만이고 이슈 연동도 없으면 LLM 호출 없이 warn
+  if (ctx.pr.body.length < 50 && !hasIssue) {
     return {
       id: 'plan-match',
-      label: 'Jira ↔ PR ↔ 작업 일치',
+      label: '이슈 ↔ PR ↔ 작업 일치성 (Traceability)',
       status: 'warn',
       emoji: statusEmoji('warn'),
-      detail: `PR 본문이 ${ctx.pr.body.length}자로 불충분하고 Jira 연동 정보가 없어 일치성 검증 불가`,
+      detail: `PR 본문이 ${ctx.pr.body.length}자로 불충분하고 연관 이슈 정보가 없어 요구사항 일치성 검증 불가`,
       tokenUsage: emptyUsage(),
     };
   }
 
   // 파일 변경 요약
   const fileChanges = ctx.files
+    .slice(0, 40)
     .map((f) => `${f.filename} (${f.status}, +${f.additions} -${f.deletions})`)
     .join('\n');
 
-  const systemPrompt = 
-    `Jira 기획 내용, GitHub PR 개발 계획, 그리고 실제 변경 파일 목록을 삼각 비교하여 상호 정합성을 검증하세요. ` +
-    `계획된 기획 및 개발 내용 중 실제 소스코드 변경에서 누락된 사항(gaps)이나, 계획에 없었으나 임의로 수정/추가된 사항(extras)을 찾아 JSON으로 반환하세요.\n\n` +
-    `JSON 출력 규격 (이모지는 절대 사용하지 마세요. Do not use any emojis in your response):\n` +
+  const systemPrompt =
+    `당신은 소프트웨어 요구사항 추적성(Traceability) 분석 전문가입니다.\n` +
+    `연관 이슈(${issueType} ${issueKey})와 PR 개발 계획, 실제 변경된 소스코드를 비교하여 정합성을 검증하세요.\n\n` +
+    `반드시 생각 과정을 출력하지 말고 즉시 아래 JSON 형식만 반환하세요:\n` +
     `{\n` +
     `  "match": true,\n` +
-    `  "gaps": ["기획/계획에 있지만 실제 작업 내용 및 파일 변경에서 누락된 핵심 항목들"],\n` +
-    `  "extras": ["기획/계획에는 없지만 실제 변경 파일 및 코드에 임의로 추가된 핵심 항목들"]\n` +
-    `}\n` +
-    `생각 과정(thinking/reasoning)은 생략하고 즉시 JSON만 출력하세요. Skip thinking and output JSON directly.`;
+    `  "gaps": ["누락된 요구사항 (없으면 빈 배열)"],\n` +
+    `  "extras": ["범위 초과 변경 (없으면 빈 배열)"],\n` +
+    `  "analysisSummary": "전체 정합성에 대한 명확한 한 줄 요약"\n` +
+    `}\n\n` +
+    `규칙: 모든 설명은 친절한 한국어로 작성하고, 이모지는 사용하지 마세요.`;
 
-  const userPrompt = 
-    `## 1. Jira 기획 이슈\n` +
-    `- 제목: ${jiraSummary}\n` +
-    `- 설명: ${jiraDesc.slice(0, 1000)}\n\n` +
-    `## 2. GitHub PR 개발 계획 (PR 본문)\n` +
-    `${ctx.pr.body.slice(0, 1000)}\n\n` +
+  const userPrompt =
+    `## 1. 연관 이슈 정보 (${issueType} #${issueKey})\n` +
+    `- 제목: ${issueTitle}\n` +
+    `- 설명: ${issueDesc.slice(0, 800)}\n\n` +
+    `## 2. GitHub PR 본문\n` +
+    `${ctx.pr.body.slice(0, 800)}\n\n` +
     `## 3. 실제 변경 파일 목록\n` +
     `${fileChanges}`;
 
@@ -59,46 +66,46 @@ export async function checkPlanMatch(ctx: CheckContext, llm: LLMClient): Promise
     const result = await llm.chat({
       systemPrompt,
       userPrompt,
-      maxTokens: 3072,
+      maxTokens: 4096,
       jsonMode: true,
-      reasoningEffort: 'medium'
+      reasoningEffort: 'none',
     });
     const parsed = llm.parseJson(result.content, PlanMatchSchema);
 
     if (parsed.match && parsed.gaps.length === 0 && parsed.extras.length === 0) {
       return {
         id: 'plan-match',
-        label: 'Jira ↔ PR ↔ 작업 일치',
+        label: '이슈 ↔ PR ↔ 작업 일치성 (Traceability)',
         status: 'pass',
         emoji: statusEmoji('pass'),
-        detail: 'Jira 기획 이슈와 PR 개발 계획, 그리고 실제 코드 작업이 완벽하게 일치합니다.',
+        detail: `연관 이슈(${issueType} ${issueKey})의 요구사항과 PR 설명, 실제 코드 변경점이 완벽하게 일치합니다.\n- **분석 요약**: ${parsed.analysisSummary}`,
         tokenUsage: result.usage,
       };
     }
 
-    let detail = '';
+    let detail = `- **분석 요약**: ${parsed.analysisSummary}\n\n`;
     if (parsed.gaps.length > 0) {
-      detail += '**누락 항목 (Gaps):**\n' + parsed.gaps.map((g) => `- ${g}`).join('\n') + '\n\n';
+      detail += '**누락된 요구사항 (Gaps):**\n' + parsed.gaps.map((g) => `- ${g}`).join('\n') + '\n\n';
     }
     if (parsed.extras.length > 0) {
-      detail += '**범위 초과 (Extras):**\n' + parsed.extras.map((e) => `- ${e}`).join('\n');
+      detail += '**범위 초과 변경 (Scope Creep / Extras):**\n' + parsed.extras.map((e) => `- ${e}`).join('\n');
     }
 
     return {
       id: 'plan-match',
-      label: 'Jira ↔ PR ↔ 작업 일치',
-      status: 'warn',
-      emoji: statusEmoji('warn'),
+      label: '이슈 ↔ PR ↔ 작업 일치성 (Traceability)',
+      status: parsed.gaps.length > 0 ? 'warn' : 'info',
+      emoji: statusEmoji(parsed.gaps.length > 0 ? 'warn' : 'info'),
       detail: detail.trim(),
       tokenUsage: result.usage,
     };
   } catch (err) {
     return {
       id: 'plan-match',
-      label: 'Jira ↔ PR ↔ 작업 일치',
+      label: '이슈 ↔ PR ↔ 작업 일치성 (Traceability)',
       status: 'warn',
       emoji: statusEmoji('warn'),
-      detail: `LLM 삼중 일치성 검증 실패: ${String(err)}`,
+      detail: `삼각 일치성 검증 실패: ${String(err)}`,
       tokenUsage: emptyUsage(),
     };
   }

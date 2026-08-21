@@ -1,12 +1,5 @@
 import type { ZodSchema } from 'zod';
 
-/** 토큰 사용량 */
-export interface TokenUsage {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-}
-
 /** LLM 호출 옵션 */
 export interface ChatOptions {
   systemPrompt: string;
@@ -18,6 +11,13 @@ export interface ChatOptions {
   reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
 }
 
+/** 토큰 사용량 */
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 /** LLM 호출 결과 */
 export interface ChatResult {
   content: string;
@@ -26,8 +26,7 @@ export interface ChatResult {
 }
 
 /**
- * govail-gateway LLM 호출 클라이언트
- * OpenAI-compatible /v1/chat/completions 엔드포인트 사용
+ * vLLM 게이트웨이 연동 LLM 클라이언트
  */
 export class LLMClient {
   private baseUrl: string;
@@ -35,8 +34,8 @@ export class LLMClient {
   private apiKey: string;
 
   constructor() {
-    this.baseUrl = (process.env.LLM_GATEWAY_URL ?? 'http://localhost:4000').replace(/\/$/, '');
-    this.model = process.env.LLM_MODEL ?? 'qwen3-8b';
+    this.baseUrl = process.env.LLM_GATEWAY_URL ?? 'http://192.0.2.1:14000';
+    this.model = process.env.LLM_MODEL ?? 'auto';
     this.apiKey = process.env.LLM_API_KEY ?? '';
   }
 
@@ -45,7 +44,7 @@ export class LLMClient {
     const {
       systemPrompt,
       userPrompt,
-      maxTokens = 2048,
+      maxTokens = 3072,
       temperature = 0.2,
       jsonMode = false,
       model,
@@ -62,19 +61,20 @@ export class LLMClient {
       temperature: reasoningEffort === 'none' ? 0.0 : temperature,
       ...(jsonMode && { response_format: { type: 'json_object' } }),
       extra_body: {
+        chat_template_kwargs: { enable_thinking: reasoningEffort !== 'none' },
         ...(reasoningEffort && { reasoning_effort: reasoningEffort }),
         ...(reasoningEffort === 'none' && {
           thinking: false,
           reasoning_format: 'none',
           max_thinking_tokens: 0,
-          thinking_budget: 0
-        })
-      }
+          thinking_budget: 0,
+        }),
+      },
     };
 
     const start = Date.now();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 90_000);
+    const timeout = setTimeout(() => controller.abort(), 180_000);
 
     try {
       const res = await fetch(`${this.baseUrl}/v1/chat/completions`, {
@@ -93,7 +93,7 @@ export class LLMClient {
         throw new Error(`LLM 호출 실패 (HTTP ${res.status}): ${errText}`);
       }
 
-      const data = await res.json() as {
+      const data = (await res.json()) as {
         choices: Array<{ message: { content: string } }>;
         usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
       };
@@ -118,46 +118,69 @@ export class LLMClient {
     }
   }
 
-  /** JSON 파싱 + Zod 스키마 검증 */
+  /** JSON 파싱 + Zod 스키마 검증 (다중 후보 탐색 및 견고한 복원기) */
   parseJson<T>(content: string, schema: ZodSchema<T>): T {
     let cleanContent = content.trim();
 
-    // 마크다운 코드 블록(```json ... ```) 제거
-    if (cleanContent.includes('```')) {
-      const match = cleanContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      if (match) {
-        cleanContent = match[1].trim();
+    // 1. 마크다운 코드 블록(```json ... ```) 우선 추출
+    const codeBlockMatches = cleanContent.matchAll(/```(?:json)?\s*([\s\S]*?)\s*```/g);
+    for (const match of codeBlockMatches) {
+      const candidate = match[1].trim();
+      const parsed = this.tryParseAndValidate(candidate, schema);
+      if (parsed) return parsed;
+    }
+
+    // 2. 전체 문자열 직접 파싱 시도
+    const directParsed = this.tryParseAndValidate(cleanContent, schema);
+    if (directParsed) return directParsed;
+
+    // 3. 문자열 내의 모든 유효한 JSON 객체 탐색
+    let depth = 0;
+    let startIdx = -1;
+    for (let i = 0; i < cleanContent.length; i++) {
+      if (cleanContent[i] === '{') {
+        if (depth === 0) startIdx = i;
+        depth++;
+      } else if (cleanContent[i] === '}') {
+        depth--;
+        if (depth === 0 && startIdx !== -1) {
+          const candidate = cleanContent.slice(startIdx, i + 1);
+          const parsed = this.tryParseAndValidate(candidate, schema);
+          if (parsed) return parsed;
+          startIdx = -1;
+        }
       }
     }
 
-    // 본문 속에 중괄호 JSON 구조가 파묻혀 있거나 뒤에 설명 텍스트가 있다면 중괄호 영역만 추출
-    if (cleanContent.includes('{') && cleanContent.includes('}')) {
-      const startIdx = cleanContent.indexOf('{');
-      const endIdx = cleanContent.lastIndexOf('}');
-      if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-        cleanContent = cleanContent.slice(startIdx, endIdx + 1).trim();
-      }
+    // 4. 마지막 수단: 첫 번째 { ~ 마지막 } 슬라이스 복원
+    const firstBrace = cleanContent.indexOf('{');
+    const lastBrace = cleanContent.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      const candidate = cleanContent.slice(firstBrace, lastBrace + 1);
+      const parsed = this.tryParseAndValidate(candidate, schema);
+      if (parsed) return parsed;
     }
 
-    // 키값의 쌍따옴표 누락 복원 필터 (e.g. why: "..." -> "why": "...")
-    if (cleanContent.startsWith('{')) {
-      cleanContent = cleanContent.replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
-    }
+    console.error(`[JSON Parse Error] 유효한 JSON 객체 탐색 실패. Content: ${content}`);
+    throw new Error(`LLM 응답 JSON 파싱 및 스키마 검증 실패: ${content.slice(0, 200)}`);
+  }
 
-    let parsed: unknown;
+  private tryParseAndValidate<T>(raw: string, schema: ZodSchema<T>): T | null {
     try {
-      parsed = JSON.parse(cleanContent);
-    } catch (err) {
-      console.error(`[JSON Parse Error] 파싱 실패. Content: ${content}`, err);
-      throw new Error(`LLM 응답 JSON 파싱 실패: ${content.slice(0, 200)}`);
+      let formatted = raw.trim();
+      // 누락된 키 쌍따옴표 복원
+      if (formatted.startsWith('{')) {
+        formatted = formatted.replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
+      }
+      const obj = JSON.parse(formatted);
+      const res = schema.safeParse(obj);
+      if (res.success) {
+        return res.data;
+      }
+    } catch {
+      // ignore
     }
-
-    const result = schema.safeParse(parsed);
-    if (!result.success) {
-      console.error(`[Zod Schema Error] 검증 실패. Parsed:`, parsed, `Error:`, result.error.message);
-      throw new Error(`스키마 검증 실패: ${result.error.message}`);
-    }
-    return result.data;
+    return null;
   }
 }
 

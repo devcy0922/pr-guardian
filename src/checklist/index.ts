@@ -10,6 +10,7 @@ import { checkTestQuality } from './test-quality.js';
 import { checkFileClassify } from './file-classify.js';
 import { checkPlanMatch } from './plan-match.js';
 import { checkBusinessIntent } from './business-intent.js';
+import { checkActionableSuggestions } from './actionable-suggestions.js';
 
 /** 체크 상태 */
 export type CheckStatus = 'pass' | 'warn' | 'fail' | 'skip' | 'info';
@@ -33,6 +34,17 @@ export interface GuardrailSet {
 export interface JiraIssueData {
   summary: string;
   description: string;
+  fixVersions?: string[];
+}
+
+/** 통합 이슈 데이터 인터페이스 (GitHub Issue 및 Jira Issue 공통 규격) */
+export interface IssueData {
+  type: 'github' | 'jira';
+  keyOrNumber: string;
+  title: string;
+  description: string;
+  labels?: string[];
+  url?: string;
 }
 
 /** 체크리스트 실행 컨텍스트 */
@@ -41,6 +53,7 @@ export interface CheckContext {
   files: PullRequestFile[];
   diff: string;
   guardrails: GuardrailSet;
+  issue?: IssueData | null;
   jira?: JiraIssueData | null;
 }
 
@@ -51,32 +64,68 @@ export interface CheckRunResult {
   llmCalls: number;
 }
 
-/** 상태별 텍스트 배지 (이모지 전면 제거) */
+/** 상태별 텍스트 배지 */
 export function statusEmoji(status: CheckStatus): string {
   const map: Record<CheckStatus, string> = {
-    pass: 'PASS', warn: 'WARN', fail: 'FAIL', skip: 'SKIP', info: 'INFO',
+    pass: 'PASS',
+    warn: 'WARN',
+    fail: 'FAIL',
+    skip: 'SKIP',
+    info: 'INFO',
   };
   return `[${map[status]}]`;
 }
 
 /**
- * 모든 체크리스트 병렬 실행
- * Layer 0 (Deterministic) + Layer 1 (Hybrid/LLM) + Layer 2 (LLM) 동시 실행
+ * Concurrency 풀 헬퍼 (동시 실행 작업 수 제어)
+ */
+async function runWithConcurrency<T>(tasks: Array<() => Promise<T>>, concurrency: number): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let currentIndex = 0;
+
+  async function worker() {
+    while (currentIndex < tasks.length) {
+      const index = currentIndex++;
+      results[index] = await tasks[index]();
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(concurrency, tasks.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
+/**
+ * 모든 체크리스트 체계적 실행
+ * 1. Layer 0 (Deterministic) + Layer 1 (Static/Hybrid) 즉시 실행
+ * 2. Layer 2 (LLM 심층 분석) Concurrency 2~3으로 안정적 실행
  */
 export async function runAllChecks(ctx: CheckContext, llm: LLMClient): Promise<CheckRunResult> {
-  const results = await Promise.all([
-    // Layer 0 — Deterministic (LLM 0회)
+  // 1단계: 정적/결정적 검사 즉시 실행
+  const [testExists, fileClassify, convention] = await Promise.all([
     checkTestExists(ctx),
     checkFileClassify(ctx),
-    // Layer 1 — Hybrid (정적 검증 후 필요시 조건부 LLM 호출)
     checkConvention(ctx),
-    checkSecurity(ctx, llm),
-    // Layer 2 — LLM 필수 (병렬 동시 실행)
-    checkSummary(ctx, llm),
-    checkTestQuality(ctx, llm),
-    checkPlanMatch(ctx, llm),
-    checkBusinessIntent(ctx, llm),
   ]);
+
+  // 2단계: LLM 기반 검사 (동시 2개씩 풀링하여 vLLM 큐 과부하 및 타임아웃 방지)
+  const llmTasks: Array<() => Promise<CheckResult>> = [
+    () => checkSecurity(ctx, llm),
+    () => checkSummary(ctx, llm),
+    () => checkBusinessIntent(ctx, llm),
+    () => checkTestQuality(ctx, llm),
+    () => checkPlanMatch(ctx, llm),
+    () => checkActionableSuggestions(ctx, llm),
+  ];
+
+  const llmResults = await runWithConcurrency(llmTasks, 2);
+
+  const results: CheckResult[] = [
+    testExists,
+    fileClassify,
+    convention,
+    ...llmResults,
+  ];
 
   const usages = results.map((r) => r.tokenUsage);
   const totalUsage = mergeUsage(...usages);

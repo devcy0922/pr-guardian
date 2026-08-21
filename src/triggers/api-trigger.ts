@@ -26,10 +26,12 @@ const PullRequestFileSchema = z.object({
 /** PR 메타데이터 스키마 */
 const PullRequestDataSchema = z.object({
   nodeId: z.string(),
+  number: z.number().default(0),
   title: z.string(),
   body: z.string().default(''),
   branch: z.string(),
   author: z.string().default('unknown'),
+  url: z.string().default(''),
 });
 
 /** Jira 이슈 정보 스키마 (선택) */

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --env-file=.env --import tsx --watch src/index.ts",
+    "mcp": "node --env-file=.env --import tsx src/mcp-server.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
@@ -13,6 +14,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.14.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@octokit/rest": "^21.1.0",
     "hono": "^4.7.0",
     "ioredis": "^5.11.1",
