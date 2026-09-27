@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { handleWebhook } from './webhook.js';
 import { handleApiReview } from './triggers/api-trigger.js';
 import { closeRedis } from './lock.js';
+import { pathToFileURL } from 'node:url';
 
 const app = new Hono();
 
@@ -21,22 +22,33 @@ app.post('/webhook/github', handleWebhook);
  */
 app.post('/api/review', handleApiReview);
 
-const port = Number(process.env.PORT ?? 3000);
+/**
+ * 서버 부트스트랩 (메인 진입점일 때만 실행)
+ * 테스트(vitest)가 Hono `app`을 import할 때 실제 포트 바인드가 일어나지 않도록
+ * `serve()`와 graceful-shutdown 등록을 메인 진입점 가드 안으로 분리한다.
+ */
+const isMainModule =
+  process.argv[1] != null &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
 
-console.log(`[PR Guardian] 서버 시작 — port ${port}`);
-const server = serve({ fetch: app.fetch, port });
+if (isMainModule) {
+  const port = Number(process.env.PORT ?? 3000);
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('[PR Guardian] SIGTERM 수신 — graceful shutdown 시작');
-  await closeRedis();
-  process.exit(0);
-});
+  console.log(`[PR Guardian] 서버 시작 — port ${port}`);
+  serve({ fetch: app.fetch, port });
 
-process.on('SIGINT', async () => {
-  console.log('[PR Guardian] SIGINT 수신 — graceful shutdown 시작');
-  await closeRedis();
-  process.exit(0);
-});
+  // Graceful shutdown
+  process.on('SIGTERM', async () => {
+    console.log('[PR Guardian] SIGTERM 수신 — graceful shutdown 시작');
+    await closeRedis();
+    process.exit(0);
+  });
+
+  process.on('SIGINT', async () => {
+    console.log('[PR Guardian] SIGINT 수신 — graceful shutdown 시작');
+    await closeRedis();
+    process.exit(0);
+  });
+}
 
 export default app;
